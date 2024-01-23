@@ -43,7 +43,7 @@ int main() {
 
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
 	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
-	GLuint brickTexture = ew::loadTexture("assets/brick_color.jpg");
+	GLuint brickTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
 
 	shader.use();
 	shader.setInt("_MainTex", 0);
