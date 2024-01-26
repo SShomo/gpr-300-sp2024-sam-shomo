@@ -43,12 +43,6 @@ int main() {
 
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
 	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
-	GLuint brickTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
-
-	shader.use();
-	shader.setInt("_MainTex", 0);
-
-	shader.setVec3("_EyePos", camera.position);
 
 	camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
 	camera.target = glm::vec3(0.0f, 0.0f, 0.0f); //Look at the center of the scene
@@ -58,7 +52,16 @@ int main() {
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK); //Back face culling
 	glEnable(GL_DEPTH_TEST); //Depth testing
+
+	GLuint brickTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
+	GLuint colorTexture = ew::loadTexture("assets/foil_color.jpg");
+
 	glBindTextureUnit(0, brickTexture);
+	glBindTextureUnit(1, colorTexture);
+
+	shader.use();
+	shader.setInt("normalMap", 0);
+	shader.setInt("_MainTex", 1);
 
 
 	while (!glfwWindowShouldClose(window)) {
@@ -75,12 +78,15 @@ int main() {
 		shader.use();
 		shader.setMat4("_Model", glm::mat4(1.0f));
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
-		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 1.0, 0.0));
-		shader.setMat4("_Model", monkeyTransform.modelMatrix());
+		shader.setVec3("_EyePos", camera.position);
+
 		shader.setFloat("_Material.Ka", material.Ka);
 		shader.setFloat("_Material.Kd", material.Kd);
 		shader.setFloat("_Material.Ks", material.Ks);
 		shader.setFloat("_Material.Shininess", material.Shininess);
+
+		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 1.0, 0.0));
+		shader.setMat4("_Model", monkeyTransform.modelMatrix());
 
 		monkeyModel.draw(); //Draws monkey model using current shader
 

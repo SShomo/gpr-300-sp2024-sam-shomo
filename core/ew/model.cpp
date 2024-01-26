@@ -48,6 +48,10 @@ namespace ew {
 			if (aiMesh->HasTextureCoords(0)) {
 				vertex.uv = glm::vec2(convertAIVec3(aiMesh->mTextureCoords[0][i]));
 			}
+			if (aiMesh->HasTangentsAndBitangents())
+			{
+				vertex.tangent = glm::vec3(convertAIVec3(aiMesh->mTangents[i]));
+			}
 			meshData.vertices.push_back(vertex);
 		}
 		//Convert faces to indices

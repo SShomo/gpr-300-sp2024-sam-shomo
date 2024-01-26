@@ -3,8 +3,7 @@
 layout(location = 0) in vec3 vPos;
 layout(location = 1) in vec3 vNormal;
 layout(location = 2) in vec2 vTexCoord;
-layout (location = 3) in vec3 vTangent;
-layout (location = 4) in vec3 vBitangent;  
+layout (location = 3) in vec3 vTangent; 
 
 uniform mat4 _Model; 
 uniform mat4 _ViewProjection;
@@ -25,7 +24,10 @@ void main(){
 	gl_Position = _ViewProjection * _Model * vec4(vPos,1.0);
 
    vec3 T = normalize(vec3(_Model * vec4(vTangent,   0.0)));
-   vec3 B = normalize(vec3(_Model * vec4(vBitangent, 0.0)));
    vec3 N = normalize(vec3(_Model * vec4(vNormal,    0.0)));
-   vs_out.TBN = transpose(mat3(T, B, N));
+   vec3 B = cross(N, T);
+
+   T = normalize(T - dot(T,N)*N);
+   vs_out.TBN = mat3(T, B, N); 
+   
 }
