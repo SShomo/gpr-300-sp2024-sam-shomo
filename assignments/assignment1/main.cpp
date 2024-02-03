@@ -41,12 +41,15 @@ float prevFrameTime;
 float deltaTime;
 
 int main() {
-	GLFWwindow* window = initWindow("Assignment 0", screenWidth, screenHeight);
+
+	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
+	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
-	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
+
 	bob::Framebuffer framebuffer = bob::createFramebuffer(screenWidth, screenHeight, GL_RGB16F);
+	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
 
 	camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
 	camera.target = glm::vec3(0.0f, 0.0f, 0.0f); //Look at the center of the scene
@@ -63,26 +66,31 @@ int main() {
 	glBindTextureUnit(0, brickTexture);
 	glBindTextureUnit(1, colorTexture);
 
-
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 	glViewport(0, 0, screenWidth, screenHeight);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 
 	shader.use();
 	shader.setInt("normalMap", 0);
 	shader.setInt("_MainTex", 1);
 
+	unsigned int dummyVAO;
+	glCreateVertexArrays(1, &dummyVAO);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
+
+		//RENDER
+		glClearColor(0.6f,0.8f,0.92f,1.0f);
+
 
 		float time = (float)glfwGetTime();
 		deltaTime = time - prevFrameTime;
 		prevFrameTime = time;
 
-		//RENDER
-		glClearColor(0.6f,0.8f,0.92f,1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 1.0, 0.0));
+		cameraController.move(window, &camera, deltaTime);
 		shader.use();
 		shader.setMat4("_Model", glm::mat4(1.0f));
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
@@ -93,13 +101,18 @@ int main() {
 		shader.setFloat("_Material.Ks", material.Ks);
 		shader.setFloat("_Material.Shininess", material.Shininess);
 
-		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 1.0, 0.0));
 		shader.setMat4("_Model", monkeyTransform.modelMatrix());
 
 		monkeyModel.draw(); //Draws monkey model using current shader
 
-		cameraController.move(window, &camera, deltaTime);
 
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		ppShader.use();
+		glBindTextureUnit(0, framebuffer.colorBuffer[0]);
+		glBindVertexArray(dummyVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 		drawUI();
 
 		glfwSwapBuffers(window);

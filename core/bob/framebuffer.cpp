@@ -9,17 +9,16 @@ bob::Framebuffer bob::createFramebuffer(unsigned int width, unsigned int height,
 	fbo.width = width;
 	fbo.height = height;
 
-	glGenFramebuffers(1, &fbo.fbo); //Create new frame buffer object
+	glCreateFramebuffers(1, &fbo.fbo); //Create new frame buffer object
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo); // Bind the new FBO as the active one
 
 	//Color Buffer
-	for (int i = 0; i < 8; i++)
-	{
-		glGenTextures(1, &fbo.colorBuffer[i]);
-		glBindTexture(GL_TEXTURE_2D, fbo.colorBuffer[i]);
-		glTexStorage2D(GL_TEXTURE_2D, 1, colorFormat, fbo.width, fbo.height);
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, fbo.colorBuffer[i], 0);
-	}
+
+	glGenTextures(1, &fbo.colorBuffer[0]);
+	glBindTexture(GL_TEXTURE_2D, fbo.colorBuffer[0]);
+	glTexStorage2D(GL_TEXTURE_2D, 1, colorFormat, fbo.width, fbo.height);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, fbo.colorBuffer[0], 0);
+
 
 	//Depth Buffer
 	glGenTextures(1, &fbo.depthBuffer);
@@ -33,8 +32,6 @@ bob::Framebuffer bob::createFramebuffer(unsigned int width, unsigned int height,
 	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbo.width, fbo.height);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-
 
 	return fbo;
 }

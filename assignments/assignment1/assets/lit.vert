@@ -14,7 +14,6 @@ out Surface{
 	vec2 TexCoord;
 	mat3 TBN;
 	vec2 UV;
-
 }vs_out;
 
 vec4 vertices[3] = {
@@ -30,10 +29,10 @@ void main(){
 	vs_out.WorldNormal = transpose(inverse(mat3(_Model))) * vNormal;
 	vs_out.TexCoord = vTexCoord;
 
-	vs_out.UV = vertices[gl_VertexID].zw;
-	gl_Position = vec4(vertices[gl_VertexID].xy,0,1);
+	//vs_out.UV = vertices[gl_VertexID].zw;
+	//gl_Position = vec4(vertices[gl_VertexID].xy,0,1);
 
-	//gl_Position = _ViewProjection * _Model * vec4(vPos,1.0);
+	gl_Position = _ViewProjection * _Model * vec4(vPos,1.0);
 
    vec3 T = normalize(vec3(_Model * vec4(vTangent,   0.0)));
    vec3 N = normalize(vec3(_Model * vec4(vNormal,    0.0)));
@@ -41,5 +40,5 @@ void main(){
 
    T = normalize(T - dot(T,N)*N);
    vs_out.TBN = mat3(T, B, N); 
-   
+
 }
