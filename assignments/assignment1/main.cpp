@@ -34,6 +34,8 @@ struct Material {
 	float Shininess = 128;
 }material;
 
+float blurEffect = 1.0f;
+int kernal;
 
 int screenWidth = 1080;
 int screenHeight = 720;
@@ -45,10 +47,10 @@ int main() {
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
+	bob::Framebuffer framebuffer = bob::createFramebuffer(screenWidth, screenHeight, GL_RGB16F);
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
 
-	bob::Framebuffer framebuffer = bob::createFramebuffer(screenWidth, screenHeight, GL_RGB16F);
 	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
 
 	camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
@@ -63,13 +65,6 @@ int main() {
 	GLuint brickTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
 	GLuint colorTexture = ew::loadTexture("assets/foil_color.jpg");
 
-	glBindTextureUnit(0, brickTexture);
-	glBindTextureUnit(1, colorTexture);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
-	glViewport(0, 0, screenWidth, screenHeight);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 
 	shader.use();
 	shader.setInt("normalMap", 0);
@@ -79,19 +74,22 @@ int main() {
 	glCreateVertexArrays(1, &dummyVAO);
 
 	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
-
 		//RENDER
-		glClearColor(0.6f,0.8f,0.92f,1.0f);
 
+		glBindTextureUnit(0, brickTexture);
+		glBindTextureUnit(1, colorTexture);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+		glViewport(0, 0, screenWidth, screenHeight);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glfwPollEvents();
+		glClearColor(0.6f,0.8f,0.92f,1.0f);
 
 		float time = (float)glfwGetTime();
 		deltaTime = time - prevFrameTime;
 		prevFrameTime = time;
 
-		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 1.0, 0.0));
-		cameraController.move(window, &camera, deltaTime);
 		shader.use();
+
 		shader.setMat4("_Model", glm::mat4(1.0f));
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
 		shader.setVec3("_EyePos", camera.position);
@@ -100,19 +98,24 @@ int main() {
 		shader.setFloat("_Material.Kd", material.Kd);
 		shader.setFloat("_Material.Ks", material.Ks);
 		shader.setFloat("_Material.Shininess", material.Shininess);
-
 		shader.setMat4("_Model", monkeyTransform.modelMatrix());
 
-		monkeyModel.draw(); //Draws monkey model using current shader
 
+		monkeyModel.draw(); //Draws monkey model using current shader
+		cameraController.move(window, &camera, deltaTime);
+		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		ppShader.use();
+		ppShader.setFloat("_Blur", blurEffect);
+		ppShader.setInt("_Kernal", kernal);
+
 		glBindTextureUnit(0, framebuffer.colorBuffer[0]);
 		glBindVertexArray(dummyVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
+
 		drawUI();
 
 		glfwSwapBuffers(window);
@@ -131,6 +134,13 @@ void drawUI() {
 		ImGui::SliderFloat("DiffuseK", &material.Kd, 0.0f, 1.0f);
 		ImGui::SliderFloat("SpecularK", &material.Ks, 0.0f, 1.0f);
 		ImGui::SliderFloat("Shininess", &material.Shininess, 2.0f, 1024.0f);
+
+	}
+
+	if (ImGui::CollapsingHeader("Image Convolution")) {
+		ImGui::SliderInt("Effect", &kernal, 0.0f, 3.0f); //0 will give the blur effect, 1 will give the sharpen effect, 2 will give edge effect, 3 will give Gaussian blur
+		ImGui::SliderFloat("Intensity", &blurEffect, 0.0f, 8.0f);
+
 	}
 
 	if (ImGui::Button("Reset Camera")) {
