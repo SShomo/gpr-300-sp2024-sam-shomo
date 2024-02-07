@@ -40,6 +40,7 @@ int kernal;
 int screenWidth = 1080;
 int screenHeight = 720;
 float prevFrameTime;
+float gamma = 1.0f;
 float deltaTime;
 
 int main() {
@@ -110,6 +111,7 @@ int main() {
 
 		ppShader.use();
 		ppShader.setFloat("_Blur", blurEffect);
+		ppShader.setFloat("_gamma", gamma);
 		ppShader.setInt("_Kernal", kernal);
 
 		glBindTextureUnit(0, framebuffer.colorBuffer[0]);
@@ -140,6 +142,7 @@ void drawUI() {
 	if (ImGui::CollapsingHeader("Image Convolution")) {
 		ImGui::SliderInt("Effect", &kernal, 0.0f, 3.0f); //0 will give the blur effect, 1 will give the sharpen effect, 2 will give edge effect, 3 will give Gaussian blur
 		ImGui::SliderFloat("Intensity", &blurEffect, 0.0f, 8.0f);
+		ImGui::SliderFloat("Gamma Correction", &gamma, 0.0f, 8.0f);
 
 	}
 
