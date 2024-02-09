@@ -8,6 +8,7 @@
 #include <ew/transform.h>
 #include <ew/cameraController.h>
 #include <ew/texture.h>
+#include <ew/procGen.h>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -39,7 +40,11 @@ int kernal;
 
 int screenWidth = 1080;
 int screenHeight = 720;
+
+int shadowWidth = 1024;
+int shadowHeight = 1024;
 float prevFrameTime;
+float gamma = 1.0f;
 float deltaTime;
 
 int main() {
@@ -47,10 +52,10 @@ int main() {
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-	bob::Framebuffer framebuffer = bob::createFramebuffer(screenWidth, screenHeight, GL_RGB16F);
+	bob::Framebuffer framebuffer = bob::createShadowMapFramebuffer(screenWidth, screenHeight, GL_RGB16F);
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
-
+	ew::Mesh planeMesh = ew::Mesh(ew::createPlane(10, 10, 5));
 	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
 
 	camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
@@ -72,17 +77,16 @@ int main() {
 
 	unsigned int dummyVAO;
 	glCreateVertexArrays(1, &dummyVAO);
+	glBindTextureUnit(0, brickTexture);
+	glBindTextureUnit(1, colorTexture);
 
 	while (!glfwWindowShouldClose(window)) {
-		//RENDER
-
-		glBindTextureUnit(0, brickTexture);
-		glBindTextureUnit(1, colorTexture);
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
-		glViewport(0, 0, screenWidth, screenHeight);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glfwPollEvents();
-		glClearColor(0.6f,0.8f,0.92f,1.0f);
+		//RENDER
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+		glViewport(0, 0, shadowWidth, shadowHeight);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		//glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
 
 		float time = (float)glfwGetTime();
 		deltaTime = time - prevFrameTime;
@@ -100,19 +104,21 @@ int main() {
 		shader.setFloat("_Material.Shininess", material.Shininess);
 		shader.setMat4("_Model", monkeyTransform.modelMatrix());
 
-
 		monkeyModel.draw(); //Draws monkey model using current shader
+		planeMesh.draw();
 		cameraController.move(window, &camera, deltaTime);
 		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, screenWidth, screenHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		ppShader.use();
 		ppShader.setFloat("_Blur", blurEffect);
+		ppShader.setFloat("_gamma", gamma);
 		ppShader.setInt("_Kernal", kernal);
 
-		glBindTextureUnit(0, framebuffer.colorBuffer[0]);
+		glBindTextureUnit(0, framebuffer.depthBuffer);
 		glBindVertexArray(dummyVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -140,6 +146,7 @@ void drawUI() {
 	if (ImGui::CollapsingHeader("Image Convolution")) {
 		ImGui::SliderInt("Effect", &kernal, 0.0f, 3.0f); //0 will give the blur effect, 1 will give the sharpen effect, 2 will give edge effect, 3 will give Gaussian blur
 		ImGui::SliderFloat("Intensity", &blurEffect, 0.0f, 8.0f);
+		ImGui::SliderFloat("Gamma Correction", &gamma, 0.0f, 8.0f);
 
 	}
 

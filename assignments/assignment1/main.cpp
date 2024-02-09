@@ -48,7 +48,7 @@ int main() {
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-	bob::Framebuffer framebuffer = bob::createFramebuffer(screenWidth, screenHeight, GL_RGB16F);
+	bob::Framebuffer framebuffer = bob::createFramebufferWithRBO(screenWidth, screenHeight, GL_RGB16F);
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
 

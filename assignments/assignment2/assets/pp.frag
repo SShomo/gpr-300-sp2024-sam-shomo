@@ -29,6 +29,7 @@ vec3 gasblur[3] = {
 in vec2 UV;
 uniform sampler2D _ColorBuffer; 
 uniform float _Blur;
+uniform float _gamma;
 
 uniform int _Kernal;
 vec3 kernal[3];
@@ -45,8 +46,8 @@ void main(){
 
     vec2 texelSize = _Blur / textureSize(_ColorBuffer,0).xy;
     vec3 totalColor = vec3(0);
-    for(int y = -1; y <= 1; y++){
-       for(int x = -1; x <= 1; x++){
+    for(int y = 0; y <= 2; y++){
+       for(int x = 0; x <= 2; x++){
           vec2 offset = vec2(x,y) * texelSize;
             totalColor += texture(_ColorBuffer,UV + offset).rgb * kernal[x][y];
        }
@@ -56,5 +57,5 @@ void main(){
     else if(_Kernal == 3)
         totalColor /= 16;
 
-    FragColor = vec4(totalColor,1.0);
+    FragColor = vec4(pow(totalColor.rgb, vec3(1.0 / _gamma)),1.0);
 }

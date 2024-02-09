@@ -8,5 +8,7 @@ namespace bob {
 		unsigned int width;
 		unsigned int height;
 	};
-	Framebuffer createFramebuffer(unsigned int width, unsigned int height, int colorFormat);
+	Framebuffer createFramebufferWithRBO(unsigned int width, unsigned int height, int colorFormat);
+	Framebuffer createFramebufferWithDepthBuffer(unsigned int width, unsigned int height, int colorFormat);
+	Framebuffer createShadowMapFramebuffer(unsigned int width, unsigned int height, int colorFormat);
 }
