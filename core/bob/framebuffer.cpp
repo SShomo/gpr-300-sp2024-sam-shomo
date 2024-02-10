@@ -57,35 +57,29 @@ bob::Framebuffer bob::createFramebufferWithDepthBuffer(unsigned int width, unsig
 
 bob::Framebuffer bob::createShadowMapFramebuffer(unsigned int width, unsigned int height, int colorFormat)
 {
-	unsigned int shadowMap;
-
-	bob::Framebuffer fbo;
+	Framebuffer fbo;
 	fbo.width = width;
 	fbo.height = height;
 
-	glGenFramebuffers(1, &fbo.depthBuffer); //Create new frame buffer object
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.depthBuffer); // Bind the new FBO as the active one
+	glCreateFramebuffers(1, &fbo.fbo); //Create new frame buffer object
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo); // Bind the new FBO as the active one
 
-	glGenTextures(1, &shadowMap);
-	glBindTexture(GL_TEXTURE_2D, shadowMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT16, GL_FLOAT, 0);
+	glGenTextures(1, &fbo.depthBuffer);
+	glBindTexture(GL_TEXTURE_2D, fbo.depthBuffer);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, fbo.width, fbo.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
-
-	glTexStorage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, 2048, 2048);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fbo.depthBuffer, 0);
+
 	float borderColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
 
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-		std::printf("Error building Framebuffer!\n");
-	}
 
 	return fbo;
 }

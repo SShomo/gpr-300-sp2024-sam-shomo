@@ -25,6 +25,7 @@ void drawUI();
 
 //Global state
 ew::Transform monkeyTransform;
+ew::Camera light;
 ew::Camera camera;
 ew::CameraController cameraController;
 
@@ -46,16 +47,20 @@ int shadowHeight = 1024;
 float prevFrameTime;
 float gamma = 1.0f;
 float deltaTime;
-
+bob::Framebuffer shadowMap;
 int main() {
 
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-	bob::Framebuffer framebuffer = bob::createShadowMapFramebuffer(screenWidth, screenHeight, GL_RGB16F);
+	shadowMap = bob::createShadowMapFramebuffer(screenWidth, screenHeight, GL_RGB16F);
+	bob::Framebuffer framebuffer = bob::createFramebufferWithRBO(screenWidth, screenHeight, GL_RGB16F);
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
+	ew::Shader shadowShader = ew::Shader("assets/shadow.vert", "assets/shadow.frag");
 	ew::Mesh planeMesh = ew::Mesh(ew::createPlane(10, 10, 5));
+	ew::Transform planeTrans;
+	planeTrans.position = glm::vec3(0, -1, 0);
 	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
 
 	camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
@@ -63,13 +68,20 @@ int main() {
 	camera.aspectRatio = (float)screenWidth / screenHeight;
 	camera.fov = 60.0f; //Vertical field of view, in degrees
 
+	light.aspectRatio = 1;
+	light.orthographic = true;
+	light.orthoHeight = 4;
+	light.position = camera.position;
+	light.target = glm::vec3(0.0f, 0.0f, 0.0f);
+	//light.nearPlane = 0.2f;
+	//light.farPlane = 10;
+
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK); //Back face culling
 	glEnable(GL_DEPTH_TEST); //Depth testing
 
 	GLuint brickTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
 	GLuint colorTexture = ew::loadTexture("assets/foil_color.jpg");
-
 
 	shader.use();
 	shader.setInt("normalMap", 0);
@@ -81,12 +93,27 @@ int main() {
 	glBindTextureUnit(1, colorTexture);
 
 	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
-		//RENDER
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.fbo);
+		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		//glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
+
+		shadowShader.use();
+		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
+		shadowShader.setMat4("_Model", planeTrans.modelMatrix());
+		planeMesh.draw();
+		shadowShader.setMat4("_Model", monkeyTransform.modelMatrix());
+		monkeyModel.draw(); //Draws monkey model using current shader
+
+		glBindTextureUnit(0, brickTexture);
+		glBindTextureUnit(1, colorTexture);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+		glViewport(0, 0, screenWidth, screenHeight);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glfwPollEvents();
+		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
 
 		float time = (float)glfwGetTime();
 		deltaTime = time - prevFrameTime;
@@ -102,15 +129,15 @@ int main() {
 		shader.setFloat("_Material.Kd", material.Kd);
 		shader.setFloat("_Material.Ks", material.Ks);
 		shader.setFloat("_Material.Shininess", material.Shininess);
-		shader.setMat4("_Model", monkeyTransform.modelMatrix());
-
-		monkeyModel.draw(); //Draws monkey model using current shader
+		shader.setMat4("_Model", planeTrans.modelMatrix());
 		planeMesh.draw();
+
+		shader.setMat4("_Model", monkeyTransform.modelMatrix());
+		monkeyModel.draw(); //Draws monkey model using current shader
 		cameraController.move(window, &camera, deltaTime);
 		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glViewport(0, 0, screenWidth, screenHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		ppShader.use();
@@ -118,7 +145,7 @@ int main() {
 		ppShader.setFloat("_gamma", gamma);
 		ppShader.setInt("_Kernal", kernal);
 
-		glBindTextureUnit(0, framebuffer.depthBuffer);
+		glBindTextureUnit(0, framebuffer.colorBuffer[0]);
 		glBindVertexArray(dummyVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -153,6 +180,14 @@ void drawUI() {
 	if (ImGui::Button("Reset Camera")) {
 		resetCamera(&camera, &cameraController);
 	}
+	ImGui::End();
+
+	ImGui::Begin("Shadow Map");
+	ImGui::BeginChild("Shadow Map");
+	ImVec2 windowSize = ImGui::GetWindowSize();
+
+	ImGui::Image((ImTextureID)shadowMap.depthBuffer, windowSize, ImVec2(0, 1), ImVec2(1, 0));
+	ImGui::EndChild();
 	ImGui::End();
 
 	ImGui::Render();
