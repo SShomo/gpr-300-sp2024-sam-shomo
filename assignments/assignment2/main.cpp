@@ -16,8 +16,6 @@
 #include <imgui_impl_opengl3.h>
 #include <bob/framebuffer.h>
 
-
-
 void resetCamera(ew::Camera* camera, ew::CameraController* controller);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 GLFWwindow* initWindow(const char* title, int width, int height);
@@ -72,9 +70,9 @@ int main() {
 	light.orthographic = true;
 	light.orthoHeight = 4;
 	light.position = camera.position;
-	light.target = glm::vec3(0.0f, 0.0f, 0.0f);
-	//light.nearPlane = 0.2f;
-	//light.farPlane = 10;
+	light.target = glm::vec3(0.5f, 0.5f, 0.5f);
+	light.nearPlane = 0.2f;
+	light.farPlane = 10;
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK); //Back face culling
@@ -93,7 +91,7 @@ int main() {
 	glBindTextureUnit(1, colorTexture);
 
 	while (!glfwWindowShouldClose(window)) {
-
+		light.position = camera.position;
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.fbo);
 		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
@@ -102,8 +100,6 @@ int main() {
 
 		shadowShader.use();
 		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
-		shadowShader.setMat4("_Model", planeTrans.modelMatrix());
-		planeMesh.draw();
 		shadowShader.setMat4("_Model", monkeyTransform.modelMatrix());
 		monkeyModel.draw(); //Draws monkey model using current shader
 
@@ -124,6 +120,7 @@ int main() {
 		shader.setMat4("_Model", glm::mat4(1.0f));
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
 		shader.setVec3("_EyePos", camera.position);
+		shader.setMat4(" _LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
 
 		shader.setFloat("_Material.Ka", material.Ka);
 		shader.setFloat("_Material.Kd", material.Kd);
