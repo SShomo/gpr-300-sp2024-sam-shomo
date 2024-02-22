@@ -15,8 +15,9 @@ out Surface{
 	vec2 TexCoord;
 	mat3 TBN;
 	vec2 UV;
-	vec4 FragPosLightSpace;
 }vs_out;
+
+out vec4 LightSpacePos;
 
 vec4 vertices[3] = {
 	vec4(-1,-1,0,0), //Bottom left (X,Y,U,V)
@@ -31,7 +32,7 @@ void main(){
 
 	vs_out.WorldNormal = transpose(inverse(mat3(_Model))) * vNormal;
 	vs_out.TexCoord = vTexCoord;
-	vs_out.FragPosLightSpace = _LightSpaceMatrix * vec4(vs_out.WorldPos, 1.0);
+	LightSpacePos = _LightSpaceMatrix * _Model * vec4(vPos, 1.0);
 
 	gl_Position = _ViewProjection * _Model * vec4(vs_out.WorldPos, 1.0);
 

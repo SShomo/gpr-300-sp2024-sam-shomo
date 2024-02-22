@@ -34,14 +34,21 @@ struct Material {
 	float Shininess = 128;
 }material;
 
+struct Flashlight {
+	glm::vec3 dir = glm::vec3(0.005f, -1.0f, 0.0f);
+	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
+}flashlight;
+
 float blurEffect = 1.0f;
 int kernal;
+float minBias = 0.002;
+float maxBias = 0.02;
 
 int screenWidth = 1080;
 int screenHeight = 720;
 
-int shadowWidth = 1024;
-int shadowHeight = 1024;
+int shadowWidth = 2048;
+int shadowHeight = 2048;
 float prevFrameTime;
 float gamma = 1.0f;
 float deltaTime;
@@ -51,7 +58,7 @@ int main() {
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-	shadowMap = bob::createShadowMapFramebuffer(screenWidth, screenHeight, GL_RGB16F);
+	shadowMap = bob::createShadowMapFramebuffer(shadowWidth, shadowHeight, GL_RGB16F);
 	bob::Framebuffer framebuffer = bob::createFramebufferWithRBO(screenWidth, screenHeight, GL_RGB16F);
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
@@ -66,13 +73,13 @@ int main() {
 	camera.aspectRatio = (float)screenWidth / screenHeight;
 	camera.fov = 60.0f; //Vertical field of view, in degrees
 
-	light.aspectRatio = 1;
+	light.target = glm::vec3(0.0f, 0.0f, 0.0f);
+	light.position = light.target - flashlight.dir * 5.0f;// -flashlight.dir * 5.0f;
 	light.orthographic = true;
-	light.orthoHeight = 4;
-	light.position = camera.position;
-	light.target = glm::vec3(0.5f, 0.5f, 0.5f);
-	light.nearPlane = 0.2f;
-	light.farPlane = 10;
+	light.orthoHeight = 5.0f;
+	light.nearPlane = 0.01f;
+	light.farPlane = 20.0f;
+	light.aspectRatio = 1;
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK); //Back face culling
@@ -81,17 +88,26 @@ int main() {
 	GLuint brickTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
 	GLuint colorTexture = ew::loadTexture("assets/foil_color.jpg");
 
-	shader.use();
-	shader.setInt("normalMap", 0);
-	shader.setInt("_MainTex", 1);
-
 	unsigned int dummyVAO;
 	glCreateVertexArrays(1, &dummyVAO);
-	glBindTextureUnit(0, brickTexture);
-	glBindTextureUnit(1, colorTexture);
 
 	while (!glfwWindowShouldClose(window)) {
-		light.position = camera.position;
+
+		glfwPollEvents();
+
+		float time = (float)glfwGetTime();
+		deltaTime = time - prevFrameTime;
+		prevFrameTime = time;
+
+		//monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 1.0, 0.0));
+		cameraController.move(window, &camera, deltaTime);
+
+		light.position = light.target - flashlight.dir * 5.0f;
+
+		//light.position = light.target;// -flashlight.dir * 5.0f;
+
+		glCullFace(GL_FRONT);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.fbo);
 		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
@@ -102,29 +118,35 @@ int main() {
 		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
 		shadowShader.setMat4("_Model", monkeyTransform.modelMatrix());
 		monkeyModel.draw(); //Draws monkey model using current shader
+		//shadowShader.setMat4("_Model", planeTrans.modelMatrix());
+		//planeMesh.draw();
 
+		glCullFace(GL_BACK);
 		glBindTextureUnit(0, brickTexture);
 		glBindTextureUnit(1, colorTexture);
+		glBindTextureUnit(2, shadowMap.depthBuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 		glViewport(0, 0, screenWidth, screenHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glfwPollEvents();
 		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
-
-		float time = (float)glfwGetTime();
-		deltaTime = time - prevFrameTime;
-		prevFrameTime = time;
 
 		shader.use();
 
-		shader.setMat4("_Model", glm::mat4(1.0f));
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
 		shader.setVec3("_EyePos", camera.position);
-		shader.setMat4(" _LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
+		shader.setMat4("_LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
+		shader.setVec3("_LightDirection", flashlight.dir);
 
+		shader.setInt("normalMap", 0);
+		shader.setInt("_MainTex", 1);
+		shader.setInt("shadowMap", 2);
+
+		shader.setVec3("_LightColor", flashlight.color);
 		shader.setFloat("_Material.Ka", material.Ka);
 		shader.setFloat("_Material.Kd", material.Kd);
 		shader.setFloat("_Material.Ks", material.Ks);
+		shader.setFloat("minBias", minBias);
+		shader.setFloat("maxBias", maxBias);
 		shader.setFloat("_Material.Shininess", material.Shininess);
 		shader.setMat4("_Model", planeTrans.modelMatrix());
 		planeMesh.draw();
@@ -172,6 +194,23 @@ void drawUI() {
 		ImGui::SliderFloat("Intensity", &blurEffect, 0.0f, 8.0f);
 		ImGui::SliderFloat("Gamma Correction", &gamma, 0.0f, 8.0f);
 
+	}
+
+	if (ImGui::CollapsingHeader("Lighting"))
+	{
+		ImGui::SliderFloat("Light Direction X", &flashlight.dir.x, -5.0f, 5.0f);
+		ImGui::SliderFloat("Light Direction Y", &flashlight.dir.y, -5.0f, 5.0f);
+		ImGui::SliderFloat("Light Direction Z", &flashlight.dir.z, -5.0f, 5.0f);
+		ImGui::ColorEdit3("Light Color", &flashlight.color.r);
+
+		ImGui::SliderFloat("minBias", &minBias, 0.0f, 1.0f);
+		ImGui::SliderFloat("maxBias", &maxBias, 0.0f, 1.0f);
+
+		/*if (ImGui::CollapsingHeader("Shadow"))
+		{
+			ImGui::SliderFloat("Min Bias", &shadow.minBias, 0.0f, 1.0f);
+			ImGui::SliderFloat("Max Bias", &shadow.maxBias, 0.0f, 1.0f);
+		}*/
 	}
 
 	if (ImGui::Button("Reset Camera")) {
