@@ -52,6 +52,7 @@ int shadowHeight = 2048;
 float prevFrameTime;
 float gamma = 1.0f;
 float deltaTime;
+bob::Framebuffer gBuffer;
 bob::Framebuffer shadowMap;
 int main() {
 
@@ -59,9 +60,13 @@ int main() {
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
 	shadowMap = bob::createShadowMapFramebuffer(shadowWidth, shadowHeight, GL_RGB16F);
+	gBuffer = bob::createGBuffer(screenWidth, screenHeight);
 	bob::Framebuffer framebuffer = bob::createFramebufferWithRBO(screenWidth, screenHeight, GL_RGB16F);
+
+	ew::Shader geoShader = ew::Shader("assets/lit.vert", "assets/geoPass.frag");
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
+
 	ew::Shader shadowShader = ew::Shader("assets/shadow.vert", "assets/shadow.frag");
 	ew::Mesh planeMesh = ew::Mesh(ew::createPlane(10, 10, 5));
 	ew::Transform planeTrans;
@@ -104,7 +109,18 @@ int main() {
 
 		light.position = light.target - flashlight.dir * 5.0f;
 
-		//light.position = light.target;// -flashlight.dir * 5.0f;
+		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer.fbo);
+		glViewport(0, 0, gBuffer.width, gBuffer.height);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		geoShader.use();
+
+		geoShader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
+		geoShader.setMat4("_Model", monkeyTransform.modelMatrix());
+		monkeyModel.draw(); //Draws monkey model using current shader
+		geoShader.setMat4("_Model", planeTrans.modelMatrix());
+		planeMesh.draw();
 
 		glCullFace(GL_FRONT);
 
@@ -112,7 +128,7 @@ int main() {
 		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		//glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
+		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
 
 		shadowShader.use();
 		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
@@ -205,13 +221,8 @@ void drawUI() {
 
 		ImGui::SliderFloat("minBias", &minBias, 0.0f, 1.0f);
 		ImGui::SliderFloat("maxBias", &maxBias, 0.0f, 1.0f);
-
-		/*if (ImGui::CollapsingHeader("Shadow"))
-		{
-			ImGui::SliderFloat("Min Bias", &shadow.minBias, 0.0f, 1.0f);
-			ImGui::SliderFloat("Max Bias", &shadow.maxBias, 0.0f, 1.0f);
-		}*/
 	}
+
 
 	if (ImGui::Button("Reset Camera")) {
 		resetCamera(&camera, &cameraController);
@@ -220,6 +231,16 @@ void drawUI() {
 
 	ImGui::Begin("Shadow Map");
 	ImGui::BeginChild("Shadow Map");
+
+	ImGui::Begin("GBuffers"); {
+		ImVec2 texSize = ImVec2(gBuffer.width / 4, gBuffer.height / 4);
+		for (size_t i = 0; i < 3; i++)
+		{
+			ImGui::Image((ImTextureID)gBuffer.colorBuffer[i], texSize, ImVec2(0, 1), ImVec2(1, 0));
+		}}
+	ImGui::End();
+
+
 	ImVec2 windowSize = ImGui::GetWindowSize();
 
 	ImGui::Image((ImTextureID)shadowMap.depthBuffer, windowSize, ImVec2(0, 1), ImVec2(1, 0));
