@@ -66,6 +66,7 @@ int main() {
 	ew::Shader geoShader = ew::Shader("assets/lit.vert", "assets/geoPass.frag");
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
+	ew::Shader defShader = ew::Shader("assets/lit.vert", "assets/deferredLit.frag");
 
 	ew::Shader shadowShader = ew::Shader("assets/shadow.vert", "assets/shadow.frag");
 	ew::Mesh planeMesh = ew::Mesh(ew::createPlane(10, 10, 5));
@@ -90,15 +91,19 @@ int main() {
 	glCullFace(GL_BACK); //Back face culling
 	glEnable(GL_DEPTH_TEST); //Depth testing
 
-	GLuint brickTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
 	GLuint colorTexture = ew::loadTexture("assets/foil_color.jpg");
+	GLuint normalTexture = ew::loadTexture("assets/foil_normal_gl.jpg");
 
 	unsigned int dummyVAO;
 	glCreateVertexArrays(1, &dummyVAO);
-
+	
 	while (!glfwWindowShouldClose(window)) {
 
 		glfwPollEvents();
+		shader.use();
+		shader.setInt("_MainTex", 0);
+		shader.setInt("normalMap", 1);
+		shader.setInt("shadowMap", 2);
 
 		float time = (float)glfwGetTime();
 		deltaTime = time - prevFrameTime;
@@ -113,7 +118,9 @@ int main() {
 		glViewport(0, 0, gBuffer.width, gBuffer.height);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+		
+		glBindTextureUnit(0, colorTexture);
+		glBindTextureUnit(1, normalTexture);
 		geoShader.use();
 
 		geoShader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
@@ -121,6 +128,42 @@ int main() {
 		monkeyModel.draw(); //Draws monkey model using current shader
 		geoShader.setMat4("_Model", planeTrans.modelMatrix());
 		planeMesh.draw();
+
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+		glViewport(0, 0, screenWidth, screenHeight);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
+		defShader.use();
+
+		defShader.setInt("_MainTex", 0);
+		defShader.setInt("normalMap", 1);
+		defShader.setInt("shadowMap", 2);
+
+		defShader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
+		defShader.setVec3("_EyePos", camera.position);
+		defShader.setMat4("_LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
+		defShader.setVec3("_LightDirection", flashlight.dir);
+
+		defShader.setVec3("_LightColor", flashlight.color);
+		defShader.setFloat("_Material.Ka", material.Ka);
+		defShader.setFloat("_Material.Kd", material.Kd);
+		defShader.setFloat("_Material.Ks", material.Ks);
+		defShader.setFloat("minBias", minBias);
+		defShader.setFloat("maxBias", maxBias);
+
+		defShader.setFloat("_Material.Shininess", material.Shininess);
+		defShader.setMat4("_Model", planeTrans.modelMatrix());
+		planeMesh.draw();
+
+		defShader.setMat4("_Model", monkeyTransform.modelMatrix());
+		monkeyModel.draw(); //Draws monkey model using current shader
+		glBindTextureUnit(0, gBuffer.colorBuffer[0]);
+		glBindTextureUnit(1, gBuffer.colorBuffer[1]);
+		glBindTextureUnit(2, gBuffer.colorBuffer[2]);
+		glBindTextureUnit(3, shadowMap.depthBuffer);
+
+		glBindVertexArray(dummyVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glCullFace(GL_FRONT);
 
@@ -138,24 +181,20 @@ int main() {
 		//planeMesh.draw();
 
 		glCullFace(GL_BACK);
-		glBindTextureUnit(0, brickTexture);
-		glBindTextureUnit(1, colorTexture);
+		glBindTextureUnit(0, colorTexture);
+		glBindTextureUnit(1, normalTexture);
 		glBindTextureUnit(2, shadowMap.depthBuffer);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 		glViewport(0, 0, screenWidth, screenHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
-
 		shader.use();
 
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
 		shader.setVec3("_EyePos", camera.position);
 		shader.setMat4("_LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
 		shader.setVec3("_LightDirection", flashlight.dir);
-
-		shader.setInt("normalMap", 0);
-		shader.setInt("_MainTex", 1);
-		shader.setInt("shadowMap", 2);
 
 		shader.setVec3("_LightColor", flashlight.color);
 		shader.setFloat("_Material.Ka", material.Ka);
