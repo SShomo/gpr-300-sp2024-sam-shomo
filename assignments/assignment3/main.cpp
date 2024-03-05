@@ -65,7 +65,6 @@ bob::Framebuffer gBuffer;
 bob::Framebuffer shadowMap;
 
 int main() {
-
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
@@ -100,15 +99,12 @@ int main() {
 	light.farPlane = 20.0f;
 	light.aspectRatio = 1;
 
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < 64; i++)
 	{
-		for (int j = 0; j < 8; j++)
-		{
-			pointLights->position = glm::vec3(0, 0, 0);
-			pointLights->radius = 5;
-			//pointLights->color = glm::vec4((rand() *255) / 255, (rand() * 255) / 255, (rand() * 255) / 255, 1);
-			pointLights->color = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
-		}
+		pointLights[i].position = glm::vec3(i, 0, i / 2);
+		pointLights[i].radius = 1;
+		//pointLights[i].color = glm::vec4(1 / (float)(rand() * 255), 1 / (rand() * 255), 1 / (rand() * 255), 1);
+		pointLights[i].color = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
 	}
 
 	glEnable(GL_CULL_FACE);
@@ -198,10 +194,10 @@ int main() {
 		glBindVertexArray(dummyVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
+		//glDisable(GL_DEPTH_TEST); //Depth testing
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer.fbo); //Read from gBuffer 
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.fbo); //Write to current fbo
 		glBlitFramebuffer(0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-		//glDisable(GL_DEPTH_TEST); //Depth testing
 		
 		lightOrbShader.use();
 		lightOrbShader.setMat4("_ViewProjection", camera.projectionMatrix()* camera.viewMatrix());
@@ -209,21 +205,21 @@ int main() {
 		{
 			glm::mat4 m = glm::mat4(1.0f);
 			m = glm::translate(m, pointLights[i].position);
-			m = glm::scale(m, glm::vec3(3.0f)); //Whatever radius you want
+			m = glm::scale(m, glm::vec3(0.2f)); //Whatever radius you want
 
 			lightOrbShader.setMat4("_Model", m);
 			lightOrbShader.setVec3("_Color", pointLights[i].color);
 			sphereMesh.draw();
 		}
 
-
 		glCullFace(GL_FRONT);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.fbo);
 		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
-		//glEnable(GL_DEPTH_TEST); //Depth testing
+		glEnable(GL_DEPTH_TEST); //Depth testing
 		shadowShader.use();
 		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
 		shadowShader.setMat4("_Model", monkeyTransform.modelMatrix());
@@ -238,7 +234,7 @@ int main() {
 
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 		glViewport(0, 0, screenWidth, screenHeight);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClear(GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
 		shader.use();
 
