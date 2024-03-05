@@ -39,6 +39,15 @@ struct Flashlight {
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
 }flashlight;
 
+struct PointLight {
+	glm::vec3 position;
+	float radius;
+	glm::vec4 color;
+};
+
+const int MAX_POINT_LIGHTS = 64;
+PointLight pointLights[MAX_POINT_LIGHTS];
+
 float blurEffect = 1.0f;
 int kernal;
 float minBias = 0.002;
@@ -54,6 +63,7 @@ float gamma = 1.0f;
 float deltaTime;
 bob::Framebuffer gBuffer;
 bob::Framebuffer shadowMap;
+
 int main() {
 
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
@@ -67,9 +77,12 @@ int main() {
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
 	ew::Shader defShader = ew::Shader("assets/lit.vert", "assets/deferredLit.frag");
+	ew::Shader lightOrbShader = ew::Shader("assets/lightOrb.vert", "assets/lightOrb.frag");
 
 	ew::Shader shadowShader = ew::Shader("assets/shadow.vert", "assets/shadow.frag");
-	ew::Mesh planeMesh = ew::Mesh(ew::createPlane(10, 10, 5));
+	ew::Mesh planeMesh = ew::Mesh(ew::createPlane(50, 50, 5));
+	ew::Mesh sphereMesh = ew::Mesh(ew::createSphere(1.0f, 8));
+
 	ew::Transform planeTrans;
 	planeTrans.position = glm::vec3(0, -1, 0);
 	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
@@ -87,6 +100,17 @@ int main() {
 	light.farPlane = 20.0f;
 	light.aspectRatio = 1;
 
+	for (int i = 0; i < 8; i++)
+	{
+		for (int j = 0; j < 8; j++)
+		{
+			pointLights->position = glm::vec3(0, 0, 0);
+			pointLights->radius = 5;
+			//pointLights->color = glm::vec4((rand() *255) / 255, (rand() * 255) / 255, (rand() * 255) / 255, 1);
+			pointLights->color = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
+		}
+	}
+
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK); //Back face culling
 	glEnable(GL_DEPTH_TEST); //Depth testing
@@ -96,7 +120,7 @@ int main() {
 
 	unsigned int dummyVAO;
 	glCreateVertexArrays(1, &dummyVAO);
-	
+
 	while (!glfwWindowShouldClose(window)) {
 
 		glfwPollEvents();
@@ -135,6 +159,14 @@ int main() {
 		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
 		defShader.use();
 
+		for (int i = 0; i < MAX_POINT_LIGHTS; i++) {
+			//Creates prefix "_PointLights[0]." etc
+			std::string prefix = "_PointLights[" + std::to_string(i) + "].";
+			defShader.setVec3(prefix + "position", pointLights[i].position);
+			defShader.setVec3(prefix + "color", pointLights[i].color);
+			defShader.setFloat(prefix + "radius", pointLights[i].radius);
+		}
+
 		defShader.setInt("_MainTex", 0);
 		defShader.setInt("normalMap", 1);
 		defShader.setInt("shadowMap", 2);
@@ -157,6 +189,7 @@ int main() {
 
 		defShader.setMat4("_Model", monkeyTransform.modelMatrix());
 		monkeyModel.draw(); //Draws monkey model using current shader
+
 		glBindTextureUnit(0, gBuffer.colorBuffer[0]);
 		glBindTextureUnit(1, gBuffer.colorBuffer[1]);
 		glBindTextureUnit(2, gBuffer.colorBuffer[2]);
@@ -165,14 +198,32 @@ int main() {
 		glBindVertexArray(dummyVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-		glCullFace(GL_FRONT);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer.fbo); //Read from gBuffer 
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.fbo); //Write to current fbo
+		glBlitFramebuffer(0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+		//glDisable(GL_DEPTH_TEST); //Depth testing
+		
+		lightOrbShader.use();
+		lightOrbShader.setMat4("_ViewProjection", camera.projectionMatrix()* camera.viewMatrix());
+		for (int i = 0; i < MAX_POINT_LIGHTS; i++)
+		{
+			glm::mat4 m = glm::mat4(1.0f);
+			m = glm::translate(m, pointLights[i].position);
+			m = glm::scale(m, glm::vec3(3.0f)); //Whatever radius you want
 
+			lightOrbShader.setMat4("_Model", m);
+			lightOrbShader.setVec3("_Color", pointLights[i].color);
+			sphereMesh.draw();
+		}
+
+
+		glCullFace(GL_FRONT);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.fbo);
 		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
-
+		//glEnable(GL_DEPTH_TEST); //Depth testing
 		shadowShader.use();
 		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
 		shadowShader.setMat4("_Model", monkeyTransform.modelMatrix());

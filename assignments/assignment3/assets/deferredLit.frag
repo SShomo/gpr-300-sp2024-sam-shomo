@@ -37,6 +37,14 @@ struct Material{
 };
 uniform Material _Material;
 
+struct PointLight{
+	vec3 position;
+	float radius;
+	vec4 color;
+};
+#define MAX_POINT_LIGHTS 64
+uniform PointLight _pointLights[MAX_POINT_LIGHTS];
+
 float ShadowCalculation(sampler2D shadowMap, vec4 fragPosLightSpace)
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -59,15 +67,48 @@ float ShadowCalculation(sampler2D shadowMap, vec4 fragPosLightSpace)
     return totalShadow;
 }  
 
+//Linear falloff
+float attenuateLinear(float distance, float radius){
+	return clamp((radius-distance)/radius, 0.0,1.0);
+}
+//Exponential falloff
+float attenuateExponential(float distance, float radius){
+	float i = clamp(1.0 - pow(distance/radius,4.0),0.0,1.0);
+	return i * i;
+}
+
+vec3 calcPointLight(PointLight light, vec3 normal){
+	vec3 diff = light.position - fs_in.WorldPos;
+	vec3 toEye = normalize(_EyePos - fs_in.WorldPos);
+	//Direction toward light position
+	vec3 toLight = normalize(diff);
+	vec3 halfway = normalize(toLight + toEye);
+	//TODO: Usual blinn-phong calculations for diffuse + specular
+	float diffuseFactor = max(dot(toLight, normal),0.0);
+	float specularFactor = pow(max(dot(normal,halfway),0.0),_Material.Shininess);
+
+	vec4 lightColor = (diffuseFactor + specularFactor) * light.color;
+	//Attenuation
+	float d = length(diff); //Distance to light
+	lightColor *= attenuateExponential(d,light.radius); //See below for attenuation options
+	return vec3(lightColor);
+}
+
+
 void main(){
 	//Make sure fragment normal is still length 1 after interpolation.
 	vec3 color = texture(diffuseTexture, fs_in.TexCoord).rgb;
-	//vec3 normal = normalize(fs_in.WorldNormal);
-
-	vec3 normal = texture(_gNormals,fs_in.UV).xyz;
+	//vec3 normal = texture(_gNormals,fs_in.UV).xyz;
+	vec3 normal = normalize(fs_in.WorldNormal);
 	vec3 worldPos = texture(_gPositions,fs_in.UV).xyz;
 	vec3 albedo = texture(_gAlbedo,fs_in.UV).xyz;
 
+	vec3 totalLight = vec3(0);
+	totalLight += calcPointLight(_pointLights[0],normal);
+
+	for(int i=0;i<MAX_POINT_LIGHTS;i++){
+		totalLight+=calcPointLight(_pointLights[i],normal);
+	}
 
 	//vec3 toLight = -_LightDirection;
 	vec3 toLight = normalize(_LightDirection - fs_in.WorldPos);
@@ -96,8 +137,7 @@ void main(){
 
 	vec3 objectColor = texture(_MainTex,fs_in.TexCoord).rrr;
 
-	vec3 lighting = lightColor * normal * worldPos * albedo;
+	//vec3 lighting = lightColor * normal * worldPos * albedo;
 
-
-	FragColor = vec4(normal * lighting,1.0);
+	FragColor = vec4(totalLight * albedo,1.0);
 }
