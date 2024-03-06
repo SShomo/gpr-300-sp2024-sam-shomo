@@ -75,7 +75,7 @@ int main() {
 	ew::Shader geoShader = ew::Shader("assets/lit.vert", "assets/geoPass.frag");
 	ew::Shader ppShader = ew::Shader("assets/pp.vert", "assets/pp.frag");
 	ew::Shader shader = ew::Shader("assets/lit.vert", "assets/lit.frag");
-	ew::Shader defShader = ew::Shader("assets/lit.vert", "assets/deferredLit.frag");
+	ew::Shader defShader = ew::Shader("assets/deferredLit.vert", "assets/deferredLit.frag");
 	ew::Shader lightOrbShader = ew::Shader("assets/lightOrb.vert", "assets/lightOrb.frag");
 
 	ew::Shader shadowShader = ew::Shader("assets/shadow.vert", "assets/shadow.frag");
@@ -134,21 +134,6 @@ int main() {
 
 		light.position = light.target - flashlight.dir * 5.0f;
 
-		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer.fbo);
-		glViewport(0, 0, gBuffer.width, gBuffer.height);
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		glBindTextureUnit(0, colorTexture);
-		glBindTextureUnit(1, normalTexture);
-		geoShader.use();
-
-		geoShader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
-		geoShader.setMat4("_Model", monkeyTransform.modelMatrix());
-		monkeyModel.draw(); //Draws monkey model using current shader
-		geoShader.setMat4("_Model", planeTrans.modelMatrix());
-		planeMesh.draw();
-
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 		glViewport(0, 0, screenWidth, screenHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -163,28 +148,17 @@ int main() {
 			defShader.setFloat(prefix + "radius", pointLights[i].radius);
 		}
 
-		defShader.setInt("_MainTex", 0);
-		defShader.setInt("normalMap", 1);
-		defShader.setInt("shadowMap", 2);
-
-		defShader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
 		defShader.setVec3("_EyePos", camera.position);
-		defShader.setMat4("_LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
-		defShader.setVec3("_LightDirection", flashlight.dir);
-
-		defShader.setVec3("_LightColor", flashlight.color);
 		defShader.setFloat("_Material.Ka", material.Ka);
 		defShader.setFloat("_Material.Kd", material.Kd);
 		defShader.setFloat("_Material.Ks", material.Ks);
-		defShader.setFloat("minBias", minBias);
-		defShader.setFloat("maxBias", maxBias);
 
 		defShader.setFloat("_Material.Shininess", material.Shininess);
-		defShader.setMat4("_Model", planeTrans.modelMatrix());
-		planeMesh.draw();
+		//defShader.setMat4("_Model", planeTrans.modelMatrix());
+		//planeMesh.draw();
 
-		defShader.setMat4("_Model", monkeyTransform.modelMatrix());
-		monkeyModel.draw(); //Draws monkey model using current shader
+		//defShader.setMat4("_Model", monkeyTransform.modelMatrix());
+		//monkeyModel.draw(); //Draws monkey model using current shader
 
 		glBindTextureUnit(0, gBuffer.colorBuffer[0]);
 		glBindTextureUnit(1, gBuffer.colorBuffer[1]);
@@ -194,23 +168,26 @@ int main() {
 		glBindVertexArray(dummyVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
+		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer.fbo);
+		glViewport(0, 0, gBuffer.width, gBuffer.height);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		geoShader.use();
+		glBindTextureUnit(0, colorTexture);
+		glBindTextureUnit(1, normalTexture);
+
+		geoShader.setInt("_MainTex", 0);
+		geoShader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
+		geoShader.setMat4("_Model", monkeyTransform.modelMatrix());
+		monkeyModel.draw(); //Draws monkey model using current shader
+		geoShader.setMat4("_Model", planeTrans.modelMatrix());
+		planeMesh.draw();
+
 		//glDisable(GL_DEPTH_TEST); //Depth testing
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer.fbo); //Read from gBuffer 
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.fbo); //Write to current fbo
 		glBlitFramebuffer(0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-		
-		lightOrbShader.use();
-		lightOrbShader.setMat4("_ViewProjection", camera.projectionMatrix()* camera.viewMatrix());
-		for (int i = 0; i < MAX_POINT_LIGHTS; i++)
-		{
-			glm::mat4 m = glm::mat4(1.0f);
-			m = glm::translate(m, pointLights[i].position);
-			m = glm::scale(m, glm::vec3(0.2f)); //Whatever radius you want
-
-			lightOrbShader.setMat4("_Model", m);
-			lightOrbShader.setVec3("_Color", pointLights[i].color);
-			sphereMesh.draw();
-		}
 
 		glCullFace(GL_FRONT);
 
@@ -218,26 +195,26 @@ int main() {
 		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
+
+
 		glEnable(GL_DEPTH_TEST); //Depth testing
+		
 		shadowShader.use();
 		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
 		shadowShader.setMat4("_Model", monkeyTransform.modelMatrix());
 		monkeyModel.draw(); //Draws monkey model using current shader
-		//shadowShader.setMat4("_Model", planeTrans.modelMatrix());
-		//planeMesh.draw();
 
-		glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 		glBindTextureUnit(0, colorTexture);
 		glBindTextureUnit(1, normalTexture);
 		glBindTextureUnit(2, shadowMap.depthBuffer);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 		glViewport(0, 0, screenWidth, screenHeight);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
-		shader.use();
 
+		glCullFace(GL_BACK);
+
+		shader.use();
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
 		shader.setVec3("_EyePos", camera.position);
 		shader.setMat4("_LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
@@ -257,6 +234,20 @@ int main() {
 		monkeyModel.draw(); //Draws monkey model using current shader
 		cameraController.move(window, &camera, deltaTime);
 		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
+
+
+		lightOrbShader.use();
+		lightOrbShader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
+		for (int i = 0; i < MAX_POINT_LIGHTS; i++)
+		{
+			glm::mat4 m = glm::mat4(1.0f);
+			m = glm::translate(m, pointLights[i].position);
+			m = glm::scale(m, glm::vec3(0.2f)); //Whatever radius you want
+
+			lightOrbShader.setMat4("_Model", m);
+			lightOrbShader.setVec3("_Color", pointLights[i].color);
+			sphereMesh.draw();
+		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
