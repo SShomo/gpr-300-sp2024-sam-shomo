@@ -7,8 +7,7 @@ in Surface{
 	vec3 WorldPos; 
 	vec3 WorldNormal;
 	vec2 TexCoord;
-	mat3 TBN;
-	vec2 UV;
+	vec4 FragPosLightSpace;
 }fs_in;
 
 uniform sampler2D _MainTex;

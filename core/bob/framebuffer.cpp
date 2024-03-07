@@ -120,6 +120,11 @@ bob::Framebuffer bob::createGBuffer(unsigned int width, unsigned int height)
 	};
 	glDrawBuffers(3, drawBuffers);
 	//TODO: Add texture2D depth buffer
+	glGenTextures(1, &framebuffer.depthBuffer);
+	glBindTexture(GL_TEXTURE_2D, framebuffer.depthBuffer);
+	//Create 16 bit depth buffer - must be same width/height of color buffer
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT16, width, height);
+	//Attach to framebuffer (assuming FBO is bound)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, framebuffer.depthBuffer, 0);
 	
 	//TODO: Check for completeness
