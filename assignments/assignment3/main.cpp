@@ -239,11 +239,11 @@ int main() {
 		shader.setFloat("minBias", minBias);
 		shader.setFloat("maxBias", maxBias);
 		shader.setFloat("_Material.Shininess", material.Shininess);
-		//shader.setMat4("_Model", planeTrans.modelMatrix());
-		//planeMesh.draw();
+		shader.setMat4("_Model", planeTrans.modelMatrix());
+		planeMesh.draw();
 
-		//shader.setMat4("_Model", monkeyTransform.modelMatrix());
-		//monkeyModel.draw(); //Draws monkey model using current shader
+		shader.setMat4("_Model", monkeyTransform.modelMatrix());
+		monkeyModel.draw(); //Draws monkey model using current shader
 		cameraController.move(window, &camera, deltaTime);
 		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
 
