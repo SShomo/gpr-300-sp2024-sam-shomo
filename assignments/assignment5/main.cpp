@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <vector>
 
 #include <ew/external/glad.h>
 #include <ew/shader.h>
@@ -39,9 +40,18 @@ struct Flashlight {
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
 }flashlight;
 
-struct Animation {
-
+struct Node {
+	glm::mat4 localTransform;
+	glm::mat4 globalTransform;
+	unsigned int parentIndex;
+	ew::Transform trans;
 };
+
+struct Hierarchy {
+	std::vector<Node*> nodes;
+	//unsigned int nodeCount;
+};
+void SolveFK(Hierarchy h);
 
 float blurEffect = 1.0f;
 int kernal;
@@ -58,7 +68,6 @@ float gamma = 1.0f;
 float deltaTime;
 bob::Framebuffer shadowMap;
 int main() {
-
 	GLFWwindow* window = initWindow("Assignment 1", screenWidth, screenHeight);
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
@@ -85,6 +94,24 @@ int main() {
 	light.farPlane = 20.0f;
 	light.aspectRatio = 1;
 
+	//Animation Stuff
+	Hierarchy hier;
+	Node head;
+	Node torso;
+	head.parentIndex = -1;
+	torso.parentIndex = 0;
+	
+	ew::Transform headTrans;
+	headTrans.position = glm::vec3(0, 1, 0);
+	head.localTransform = headTrans.modelMatrix();
+
+	ew::Transform torsoTrans;
+	torsoTrans.position = glm::vec3(0, 0, 0);
+	torso.localTransform = torsoTrans.modelMatrix();
+
+	hier.nodes.push_back(&head);
+	hier.nodes.push_back(&torso);
+
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK); //Back face culling
 	glEnable(GL_DEPTH_TEST); //Depth testing
@@ -98,32 +125,25 @@ int main() {
 	while (!glfwWindowShouldClose(window)) {
 
 		glfwPollEvents();
-
+		SolveFK(hier);
 		float time = (float)glfwGetTime();
 		deltaTime = time - prevFrameTime;
 		prevFrameTime = time;
 
-		//monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 1.0, 0.0));
 		cameraController.move(window, &camera, deltaTime);
 
 		light.position = light.target - flashlight.dir * 5.0f;
-
-		//light.position = light.target;// -flashlight.dir * 5.0f;
-
 		glCullFace(GL_FRONT);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.fbo);
 		glBindTexture(GL_TEXTURE_2D, shadowMap.depthBuffer);
 		glViewport(0, 0, shadowWidth, shadowHeight);
-		glClear(GL_DEPTH_BUFFER_BIT);
-		//glClearColor(0.6f, 0.8f, 0.92f, 1.0f);
 
 		shadowShader.use();
 		shadowShader.setMat4("_ViewProjection", light.projectionMatrix() * light.viewMatrix());
 		shadowShader.setMat4("_Model", monkeyTransform.modelMatrix());
 		monkeyModel.draw(); //Draws monkey model using current shader
-		//shadowShader.setMat4("_Model", planeTrans.modelMatrix());
-		//planeMesh.draw();
+
 
 		glCullFace(GL_BACK);
 		glBindTextureUnit(0, brickTexture);
@@ -155,10 +175,15 @@ int main() {
 		shader.setMat4("_Model", planeTrans.modelMatrix());
 		planeMesh.draw();
 
-		shader.setMat4("_Model", monkeyTransform.modelMatrix());
+		shader.setMat4("_Model", headTrans.modelMatrix());
 		monkeyModel.draw(); //Draws monkey model using current shader
+		headTrans.rotation = glm::rotate(headTrans.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
+
+		shader.setMat4("_Model", torsoTrans.modelMatrix());
+		monkeyModel.draw(); //Draws monkey model using current shader
+
 		cameraController.move(window, &camera, deltaTime);
-		monkeyTransform.rotation = glm::rotate(monkeyTransform.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
+		//headTrans.position = glm::translate(head.localTransform, glm::vec3(0.5f, 0.5, 0));
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -209,12 +234,6 @@ void drawUI() {
 
 		ImGui::SliderFloat("minBias", &minBias, 0.0f, 1.0f);
 		ImGui::SliderFloat("maxBias", &maxBias, 0.0f, 1.0f);
-
-		/*if (ImGui::CollapsingHeader("Shadow"))
-		{
-			ImGui::SliderFloat("Min Bias", &shadow.minBias, 0.0f, 1.0f);
-			ImGui::SliderFloat("Max Bias", &shadow.maxBias, 0.0f, 1.0f);
-		}*/
 	}
 
 	if (ImGui::Button("Reset Camera")) {
@@ -232,6 +251,17 @@ void drawUI() {
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void SolveFK(Hierarchy hier)
+{
+	for each (Node * node in hier.nodes)
+	{
+		if (node->parentIndex == -1)
+			node->globalTransform = node->localTransform;
+		else
+			node->globalTransform = hier.nodes[node->parentIndex]->globalTransform * node->localTransform;
+	}
 }
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
