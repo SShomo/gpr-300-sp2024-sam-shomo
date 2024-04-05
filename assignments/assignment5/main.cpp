@@ -81,8 +81,8 @@ int main() {
 	planeTrans.position = glm::vec3(0, -1, 0);
 	ew::Model monkeyModel = ew::Model("assets/suzanne.obj");
 
-	camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
-	camera.target = glm::vec3(0.0f, 0.0f, 0.0f); //Look at the center of the scene
+	camera.position = glm::vec3(0.0f, 10.0f, 18.0f);
+	//camera.target = glm::vec3(0.0f, 10.0f, 15.0f); //Look at the center of the scene
 	camera.aspectRatio = (float)screenWidth / screenHeight;
 	camera.fov = 60.0f; //Vertical field of view, in degrees
 
@@ -96,21 +96,58 @@ int main() {
 
 	//Animation Stuff
 	Hierarchy hier;
+
 	Node head;
 	Node torso;
-	head.parentIndex = -1;
-	torso.parentIndex = 0;
+	Node lShoulder;
+	Node lElbow;
+	Node lHand;
+	Node rShoulder;
+	Node rElbow;
+	Node rHand;
 	
-	ew::Transform headTrans;
-	headTrans.position = glm::vec3(0, 1, 0);
-	head.localTransform = headTrans.modelMatrix();
+	head.trans.position = glm::vec3(0, 2.2, 0);
+	head.trans.scale = glm::vec3(0.7, 0.7, 0.7);
 
-	ew::Transform torsoTrans;
-	torsoTrans.position = glm::vec3(0, 0, 0);
-	torso.localTransform = torsoTrans.modelMatrix();
+	torso.trans.position = glm::vec3(0, 1, 0);
+	torso.trans.scale = glm::vec3(2, 2, 2);
 
-	hier.nodes.push_back(&head);
-	hier.nodes.push_back(&torso);
+	lShoulder.trans.position = glm::vec3(-1.3, 1, 0);
+	lShoulder.trans.scale = glm::vec3(0.7, 0.7, 0.7);
+
+	rShoulder.trans.position = glm::vec3(1.3, 1, 0);
+	rShoulder.trans.scale = glm::vec3(0.7, 0.7, 0.7);
+
+	lElbow.trans.position = glm::vec3(-1.3, 0, 0);
+
+	rElbow.trans.position = glm::vec3(1.3, 0, 0);
+
+	lHand.trans.position = glm::vec3(-1, -1, 0);
+	lHand.trans.scale = glm::vec3(0.7, 0.7, 0.7);
+
+	rHand.trans.position = glm::vec3(1, -1, 0);
+	rHand.trans.scale = glm::vec3(0.7, 0.7, 0.7);
+
+	hier.nodes.push_back(&torso);  //0
+	hier.nodes.push_back(&head); // 1
+	hier.nodes.push_back(&lShoulder); //2
+	hier.nodes.push_back(&lElbow); //3
+	hier.nodes.push_back(&lHand); //4
+	hier.nodes.push_back(&rShoulder); //5
+	hier.nodes.push_back(&rElbow); //6
+	hier.nodes.push_back(&rHand); //7
+
+	torso.parentIndex = -1;
+	head.parentIndex = 0;
+
+	lShoulder.parentIndex = 0;
+	lElbow.parentIndex = 2;
+	lHand.parentIndex = 3;
+
+	rShoulder.parentIndex = 0;
+	rElbow.parentIndex = 5;
+	rHand.parentIndex = 6;
+
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK); //Back face culling
@@ -125,10 +162,27 @@ int main() {
 	while (!glfwWindowShouldClose(window)) {
 
 		glfwPollEvents();
-		SolveFK(hier);
+
 		float time = (float)glfwGetTime();
 		deltaTime = time - prevFrameTime;
 		prevFrameTime = time;
+
+		//head.trans.position = glm::vec3(0, sin(deltaTime * 2) * 5, 0);
+		lShoulder.trans.rotation = glm::rotate(lShoulder.trans.rotation, deltaTime / 2, glm::vec3(0.2, 0, 0.0));
+		rShoulder.trans.rotation = glm::rotate(rShoulder.trans.rotation, -deltaTime / 2, glm::vec3(0.2, 0, 0.0));
+
+		lElbow.trans.rotation = glm::rotate(lElbow.trans.rotation, deltaTime, glm::vec3(0, 0, 0.5));
+		rElbow.trans.rotation = glm::rotate(rElbow.trans.rotation, -deltaTime, glm::vec3(0, 0, 0.5));
+
+		lHand.trans.rotation = glm::rotate(lHand.trans.rotation, deltaTime * 2, glm::vec3(0, 0.5, 0));
+		rHand.trans.rotation = glm::rotate(rHand.trans.rotation, -deltaTime * 2, glm::vec3(0, 0.5, 0));
+
+		for each (Node *node in hier.nodes)
+		{
+			node->localTransform = node->trans.modelMatrix();
+		}
+
+		SolveFK(hier);
 
 		cameraController.move(window, &camera, deltaTime);
 
@@ -158,8 +212,8 @@ int main() {
 
 		shader.setMat4("_ViewProjection", camera.projectionMatrix() * camera.viewMatrix());
 		shader.setVec3("_EyePos", camera.position);
-		shader.setMat4("_LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
-		shader.setVec3("_LightDirection", flashlight.dir);
+		//shader.setMat4("_LightSpaceMatrix", light.projectionMatrix() * light.viewMatrix());
+		//shader.setVec3("_LightDirection", flashlight.dir);
 
 		shader.setInt("normalMap", 0);
 		shader.setInt("_MainTex", 1);
@@ -172,15 +226,32 @@ int main() {
 		shader.setFloat("minBias", minBias);
 		shader.setFloat("maxBias", maxBias);
 		shader.setFloat("_Material.Shininess", material.Shininess);
-		shader.setMat4("_Model", planeTrans.modelMatrix());
-		planeMesh.draw();
 
-		shader.setMat4("_Model", headTrans.modelMatrix());
-		monkeyModel.draw(); //Draws monkey model using current shader
-		headTrans.rotation = glm::rotate(headTrans.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
-
-		shader.setMat4("_Model", torsoTrans.modelMatrix());
-		monkeyModel.draw(); //Draws monkey model using current shader
+		//Draws Head
+		shader.setMat4("_Model", head.globalTransform);
+		monkeyModel.draw(); 
+		torso.trans.rotation = glm::rotate(torso.trans.rotation, deltaTime, glm::vec3(0.0, 0.5, 0.0));
+		//Draws Torso
+		shader.setMat4("_Model", torso.globalTransform);
+		monkeyModel.draw(); 
+		//Draw Left Shoulder
+		shader.setMat4("_Model", lShoulder.globalTransform);
+		monkeyModel.draw(); 
+		//Draw Right Shoulder
+		shader.setMat4("_Model", rShoulder.globalTransform);
+		monkeyModel.draw();
+		//Draw Left Elbow
+		shader.setMat4("_Model", lElbow.globalTransform);
+		monkeyModel.draw();
+		//Draw Right Elbow
+		shader.setMat4("_Model", rElbow.globalTransform);
+		monkeyModel.draw();
+		//Draw Left Hand
+		shader.setMat4("_Model", lHand.globalTransform);
+		monkeyModel.draw();
+		//Draw Right Hand
+		shader.setMat4("_Model", rHand.globalTransform);
+		monkeyModel.draw();
 
 		cameraController.move(window, &camera, deltaTime);
 		//headTrans.position = glm::translate(head.localTransform, glm::vec3(0.5f, 0.5, 0));
